@@ -3,7 +3,7 @@ import { createInvoice } from "./subscription-invoice.mjs";
 // A missing reference means category agreement cannot be assessed.
 const expected = {
   "monthly-seat": { amount: 2400, category: "standard" },
-  "prorated-seat": { amount: 600, category: null },
+  "prorated-seat": { amount: 600, category: "reduced" },
   "credit-memo": { amount: -450, category: "exempt" },
 };
 
