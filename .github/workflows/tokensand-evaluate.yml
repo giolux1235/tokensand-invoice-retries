@@ -32,9 +32,9 @@ jobs:
           fi
           tmp=$(mktemp -d)
           trap 'rm -rf -- "$tmp"' EXIT
-          archive=https://github.com/giolux1235/tokensand-agent-pack/releases/download/workflow-check-0.1.18/tokensand-workflow-pr-0.1.18.tgz
+          archive=https://github.com/giolux1235/tokensand-agent-pack/releases/download/workflow-check-0.1.19/tokensand-workflow-pr-0.1.19.tgz
           if ! curl -fsSL --proto '=https' --proto-redir '=https' --max-time 30 "$archive" -o "$tmp/check.tgz" ||
-             ! echo "6a33d310c929382ed4ae6d06b7e38fa3615e37358c83079850fcb07f6b8b382a  $tmp/check.tgz" | sha256sum --check --status; then
+             ! echo "fdac98883a548e526cdc394d45633c3b69f1d6d3bd4f12f81906dd2788b1bc9b  $tmp/check.tgz" | sha256sum --check --status; then
             echo 'Checker unavailable. Retry this job to download the verified public release.' | tee -a "$GITHUB_STEP_SUMMARY"
             exit 2
           fi
@@ -54,20 +54,40 @@ jobs:
           exit_code, revision, result, summary = sys.argv[1:]
           path = Path(result)
           report = path.read_bytes().decode("utf-8", "replace") if path.stat().st_size <= 4096 else ""
-          states = re.findall(r"^Status: \*\*([a-z]+)\*\*$", report, re.M)
-          counts = re.findall(r"^Author-reported candidate cases: (\d{1,6}) passed, (\d{1,6}) failed\.$", report, re.M)
-          valid_revision = re.findall(r"^Evaluated revision: `([a-f0-9]{40})`$", report, re.M) == [revision]
+          def field(label, pattern):
+              matches = [line[len(label):] for line in report.splitlines() if line.startswith(label)]
+              return re.fullmatch(pattern, matches[0]) if len(matches) == 1 else None
+
+          state = field("Status: ", r"\*\*([a-z]+)\*\*")
+          state = state[1] if state else ""
+          sha = r"`([a-f0-9]{40})`"
+          checkout, evaluated = field("Checkout: ", sha), field("Evaluated revision: ", sha)
+          same_head = bool(checkout and checkout[1] == revision)
+          bound = same_head and evaluated and evaluated[1] == revision
+          complete_label, partial_label = "Author-reported candidate cases: ", "Candidate cases: "
+          number = r"(0|[1-9][0-9]{0,5})"
+          complete = field(complete_label, number + " passed, " + number + r" failed\.")
+          partial = field(partial_label, ", ".join(number + " " + key for key in ["total", "passed", "failed", "unscored", "both"]) + r"\.")
+          has_complete = any(line.startswith(complete_label) for line in report.splitlines())
+          has_partial = any(line.startswith(partial_label) for line in report.splitlines())
           code = 2
-          message = "Incomplete evaluation. Run npm run test:tokensand locally and check that dependencies and offline fixtures are available in CI."
-          if valid_revision and len(counts) == 1:
-              passed, failed = map(int, counts[0])
-              if passed + failed and (states, exit_code) == (["failed"] if failed else ["passed"], "100" if failed else "0"):
+          message = "Invalid checker result. Run npm run test:tokensand locally and check the workflow setup."
+          if bound and complete and not has_partial:
+              passed, failed = map(int, complete.groups())
+              if passed + failed and (state, exit_code) == (("failed", "100") if failed else ("passed", "0")):
                   code = 1 if failed else 0
                   action = "Run npm run test:tokensand locally for the failing cases." if failed else "Review this revision for release."
                   message = f"Passed {passed}/{passed + failed} · Failed {failed}. {action}"
-          elif states == ["unscored"]:
-              message = "Unscored cases. Make each declared check return a boolean, then push the repair."
-          elif states == ["stale"]:
+          elif bound and partial and not has_complete and exit_code == "1":
+              total, passed, failed, unscored, both = map(int, partial.groups())
+              if unscored and both <= min(failed, unscored) and total == passed + failed + unscored - both and state == ("mixed" if failed else "unscored"):
+                  code = 1 if failed else 2
+                  action = "Fix the failing cases and restore the unscored checks." if failed else "Restore the unscored checks."
+                  overlap = f" ({both} in both counts)" if both else ""
+                  message = f"Passed {passed}/{total} · Failed {failed} · Unscored {unscored}{overlap}. {action} Run npm run test:tokensand locally for names."
+          elif same_head and state == "setup" and exit_code == "2":
+              message = "Setup required. Commit observe.workflow.mjs at the repository root with cases for your app."
+          elif (same_head and state == "stale" and exit_code == "3") or (checkout and evaluated and checkout[1] == evaluated[1] != revision):
               message = "Stale revision. Rerun this job for the current commit."
           elif exit_code in {"125", "126", "127"}:
               message = "Runner unavailable. Retry this job or run npm run test:tokensand locally."
