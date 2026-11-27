@@ -16,7 +16,7 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
-          fetch-depth: 4
+          fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
@@ -35,14 +35,23 @@ jobs:
       - name: Install the exact published Tokens& reviewer
         shell: bash
         env:
-          REVIEWER_COMMIT: 6aebd79fd3a3d8b0d4b879635c84884fc8fbfdb7
+          REVIEWER_COMMIT: 1f55c1ac1d8cdbc4d41e0fd7a6b2ca68f6e5907e
         run: |
           set -euo pipefail
           git init --quiet "$RUNNER_TEMP/reviewer"
           git -C "$RUNNER_TEMP/reviewer" fetch --quiet --depth 1 https://github.com/giolux1235/tokensand-agent-pack.git "$REVIEWER_COMMIT"
           git -C "$RUNNER_TEMP/reviewer" checkout --quiet --detach FETCH_HEAD
           test "$(git -C "$RUNNER_TEMP/reviewer" rev-parse HEAD)" = "$REVIEWER_COMMIT"
-      - name: Report submitted and original scores
+      - name: Review original tests
+        id: original
+        shell: bash
         env:
           REVIEW_SET: ${{ matrix.selection }}
-        run: python3 review_ci.py "$REVIEW_SET"
+        run: |
+          set -euo pipefail
+          bash review_tool_completion.sh --markdown | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Reproduce the shared macOS note on Linux
+        if: ${{ !cancelled() && (steps.original.outcome == 'success' || steps.original.outcome == 'failure') }}
+        env:
+          REVIEW_SET: ${{ matrix.selection }}
+        run: bash review_tool_completion.sh --verify-markdown ".github/reviews/$REVIEW_SET.md"
