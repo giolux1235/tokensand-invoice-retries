@@ -1,0 +1,48 @@
+name: Agent tool completion
+on:
+  push:
+    branches: [codex/tool-completion-review]
+permissions:
+  contents: read
+jobs:
+  evaluate:
+    name: Original test review (${{ matrix.selection }})
+    timeout-minutes: 5
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        selection: [mixed, repaired]
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 4
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22.22.0'
+      - name: Prepare the three locked, trusted workflow revisions
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/evaluated"
+          for variant in baseline weakened repair; do
+            sha=$(jq -er --arg key "$variant" '.[$key]' review-revisions.json)
+            [[ "$sha" =~ ^[0-9a-f]{40}$ ]]
+            git worktree add --quiet --detach "$RUNNER_TEMP/evaluated/$variant" "$sha"
+            (cd "$RUNNER_TEMP/evaluated/$variant" && npm ci --ignore-scripts --no-audit --no-fund)
+          done
+      - name: Install the exact published Tokens& reviewer
+        shell: bash
+        env:
+          REVIEWER_COMMIT: 6aebd79fd3a3d8b0d4b879635c84884fc8fbfdb7
+        run: |
+          set -euo pipefail
+          git init --quiet "$RUNNER_TEMP/reviewer"
+          git -C "$RUNNER_TEMP/reviewer" fetch --quiet --depth 1 https://github.com/giolux1235/tokensand-agent-pack.git "$REVIEWER_COMMIT"
+          git -C "$RUNNER_TEMP/reviewer" checkout --quiet --detach FETCH_HEAD
+          test "$(git -C "$RUNNER_TEMP/reviewer" rev-parse HEAD)" = "$REVIEWER_COMMIT"
+      - name: Report submitted and original scores
+        env:
+          REVIEW_SET: ${{ matrix.selection }}
+        run: python3 review_ci.py "$REVIEW_SET"
