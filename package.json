@@ -1,0 +1,12 @@
+{
+  "name": "conversation-continuation",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node ./node_modules/vitest/vitest.mjs run packages/ai/src/ui/last-assistant-message-is-complete-with-tool-calls.test.ts --no-cache --maxWorkers=1"
+  },
+  "devDependencies": {
+    "vitest": "4.1.11",
+    "tsx": "4.22.4"
+  }
+}
