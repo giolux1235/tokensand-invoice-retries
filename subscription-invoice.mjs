@@ -8,6 +8,5 @@ const entries = {
 export function createInvoice(id) {
   const entry = entries[id];
   if (!entry) throw new Error("Unknown invoice");
-  const appliedCredit = id === "prorated-seat" ? 0 : entry.credit;
-  return { amount: entry.unit * entry.seats - appliedCredit, category: entry.category };
+  return { amount: entry.unit * entry.seats - entry.credit, category: entry.category };
 }
