@@ -2,19 +2,28 @@
 
 Replay a payment webhook against a synthetic SQLite ledger. Delivering the same $15.99 payment twice used to book $31.98. The corrected code records it once, rejects a changed amount on retry, and lets separate tenants use the same event ID.
 
-With Python 3.10 or later, run the four Tokens& checks from a fresh checkout. The checker is included and runs offline. The same checks run on pull requests and pushes to main.
+With Python 3.10 or later, clone the example and enter its directory. The Tokens& checker is included.
 
 ```sh
-python3 -m unittest -v
+git clone https://github.com/giolux1235/tokensand-invoice-retries
+cd tokensand-invoice-retries
 ```
 
-To reproduce the original duplicate charge, run the same tests against the broken implementation.
+Reproduce the duplicate charge. Expect `duplicate-delivery` and `changed-amount-on-retry` to fail.
 
 ```sh
 SHOW_BUG=1 python3 -m unittest -v
 ```
 
-The broken version fails `duplicate-delivery` and `changed-amount-on-retry`. The repair passes all four cases. Both runs use identical cases and run locally with synthetic records. [Tokens& setup](https://tokensand.com/agents/install)
+Verify the repair. All four cases should pass.
 
-This is a first-party Tokens& workshop example using invented transactions. It runs without provider keys. Local checks stay on your machine.
+```sh
+python3 -m unittest -v
+```
+
+Both commands run the same cases offline. Pull requests and pushes to `main` run the same four checks.
+
+This is a first-party Tokens& workshop example using invented transactions. It runs without provider keys.
 The ledger is reset for each test case. The example exercises sequential redelivery within a batch.
+
+[View Invoice Retry Ledger on Tokens&](https://tokensand.com/p/invoice-retry-ledger) to share this example or set up checks for your own project.
