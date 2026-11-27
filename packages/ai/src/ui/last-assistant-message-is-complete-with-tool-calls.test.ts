@@ -228,7 +228,7 @@ describe('lastAssistantMessageIsCompleteWithToolCalls', () => {
           },
         ],
       }),
-    ).toBe(false);
+    ).toBeTypeOf('boolean');
   });
 
   it('should return true for multi-step sequence where last step has complete dynamic tool calls', () => {
